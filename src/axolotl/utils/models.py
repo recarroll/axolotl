@@ -150,11 +150,13 @@ def load_tokenizer(cfg):
             "CodeLlamaTokenizer",
             "CodeLlamaTokenizerFast",
         ]
-        and hasattr(tokenizer, "pad_token")
-        and not tokenizer.pad_token
     ):
-        # set a pad_token, but use eos_token so we don't add a new token
-        tokenizer.pad_token = LLAMA_DEFAULT_EOS_TOKEN
+        if hasattr(tokenizer, "pad_token") and not tokenizer.pad_token:
+            # set a pad_token, but use eos_token so we don't add a new token
+            tokenizer.pad_token = LLAMA_DEFAULT_EOS_TOKEN
+        if hasattr(tokenizer, "add_prefix_space"):
+            tokenizer.add_prefix_space = False
+
 
     if tokenizer.__class__.__name__ == "GPTNeoXTokenizerFast":
         tokenizer.add_special_tokens({"pad_token": "[PAD]"})

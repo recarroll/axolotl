@@ -13,7 +13,7 @@ from datasets import set_caching_enabled
 from torch.utils.data import DataLoader, RandomSampler
 from transformers.utils import is_torch_bf16_gpu_available
 
-from axolotl.core.trainer_builder import HFCausalTrainerBuilder, HFDPOTrainerBuilder
+from axolotl.core.trainer_builder import HFCausalTrainerBuilder, HFRLTrainerBuilder
 from axolotl.utils.distributed import is_main_process, reduce_and_broadcast, zero_first
 from axolotl.utils.samplers import MultipackBatchSampler, get_dataset_lengths
 
@@ -198,7 +198,7 @@ def calculate_total_num_steps(cfg, train_dataset, update=True):
             .apply(lambda x: len(x))  # pylint: disable=unnecessary-lambda
             .values
         )
-        LOG.debug(f"total_num_tokens: {total_num_tokens}", main_process_only=True)
+        LOG.debug(f"total_num_tokens: {total_num_tokens:_}", main_process_only=True)
         if update:
             cfg.total_num_tokens = total_num_tokens
 
@@ -212,7 +212,7 @@ def calculate_total_num_steps(cfg, train_dataset, update=True):
             .sum()
         )
         LOG.debug(
-            f"`total_supervised_tokens: {total_supervised_tokens}`",
+            f"`total_supervised_tokens: {total_supervised_tokens:_}`",
             main_process_only=True,
         )
         if update:
@@ -239,7 +239,7 @@ def calculate_total_num_steps(cfg, train_dataset, update=True):
                 * cfg.num_epochs
             )
             LOG.debug(
-                f"total_num_tokens: {cfg.total_num_tokens}, total_num_steps: {total_num_steps}",
+                f"total_num_tokens: {cfg.total_num_tokens:_}, total_num_steps: {total_num_steps:_}",
                 main_process_only=True,
             )
         else:
@@ -306,6 +306,8 @@ def calculate_total_num_steps(cfg, train_dataset, update=True):
 
 def setup_fsdp_envs(cfg):
     os.environ["ACCELERATE_USE_FSDP"] = "true"
+    if cfg.fsdp_config.fsdp_activation_checkpointing:
+        os.environ["FSDP_ACTIVATION_CHECKPOINTING"] = "true"
     if cfg.fsdp_config.fsdp_offload_params:
         os.environ["FSDP_OFFLOAD_PARAMS"] = "true"
     if cfg.fsdp_config.fsdp_sync_module_states:
@@ -338,8 +340,8 @@ def prepare_optim_env(cfg):
 
 
 def setup_trainer(cfg, train_dataset, eval_dataset, model, tokenizer, total_num_steps):
-    if cfg.rl in ["dpo", "ipo", "kto_pair"]:
-        trainer_builder = HFDPOTrainerBuilder(cfg, model[0], tokenizer)
+    if cfg.rl in ["dpo", "ipo", "kto_pair", "orpo"]:
+        trainer_builder = HFRLTrainerBuilder(cfg, model[0], tokenizer)
         trainer_builder.model_ref = model[1]
         trainer_builder.peft_config = model[2]
     else:
